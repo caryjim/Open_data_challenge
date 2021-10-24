@@ -1,4 +1,4 @@
-#' Intial file processing for the open data challenge 
+#' Initial file processing for the open data challenge 
 
 library(tidyverse)
 library(dplyr)
@@ -14,81 +14,103 @@ library(psychTools)
 broadbandurl <- 'https://raw.githubusercontent.com/BroadbandNow/Open-Data/master/broadband_data_opendatachallenge.csv'
 broadbandnow <-read.csv(url(broadbandurl), header = T, sep = ",", strip.white = TRUE)
 
-head(broadband)
+#' Broadband-Now Data has 32608 rows of zipcode level data and 23 variables
+head(broadbandnow)
 
-# Broadband Usage Estimates by County Level 
-microsoft <- 'https://raw.githubusercontent.com/microsoft/USBroadbandUsagePercentages/3cc660f1f54fd73274527a4a60ef870726abf2ba/dataset/broadband_data.csv'
+#Export the file for backup
+#write.csv(broadbandnow, "./Datasets/broadbandnow-export.csv", row.names = F)
 
-usage_county <- read.csv(url(microsoft), header = T, sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
+#-------------------Microsoft Broadband Usage------------------------------
+#'The github dataset has been updated in June 2021. Therefore loading from original file in March 2021. 
+
+# Broadband Usage Estimates by County Level in Nov 2019
+usage_county <- read.csv("./Datasets/Microsoft/broadband_data-2019-v1.csv", 
+                         header = T, sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
 
 # Broadband Usage Estimates by Zip Code 
-microsoft_by_zip <- 'https://raw.githubusercontent.com/microsoft/USBroadbandUsagePercentages/3cc660f1f54fd73274527a4a60ef870726abf2ba/dataset/broadband_data_zipcode.csv'
+usage_zip <- read.csv("./Datasets/Microsoft/broadband_data_zipcode-2019-v1.csv",
+                      header = T, sep = ",", strip.white = TRUE)
 
-usage_zip <- read.csv(url(microsoft_by_zip), header = T, sep = ",", strip.white = TRUE)
-
+# There are 3143 rows of county in the dataset with 5 variables 
 head(usage_county)
 
+# There are 32735 rows of postal code -ZIP- in the dataset with 8 variables
 head(usage_zip)
 
-## Can we append the two microsoft dataset and then join the broadband data?
+# Joint microsoft dataset
 usage_combined <- left_join(usage_zip, usage_county, by = "COUNTY.ID")
+# There are 32725 rows in this joint dataframe 
 head(usage_combined)
 
-#Rename column heading in order to match 
+# Rename column heading in order to match 
 colnames(usage_combined)[4] <- "Zip"
 head(usage_combined)
 
-combined <- left_join(usage_combined, broadband, by = "Zip")
+# Joint with Broadband-Now dataframe
+combined <- left_join(usage_combined, broadbandnow, by = "Zip")
+# There are 32735 rows with 34 variables in this dataframe 
 head(combined)
+# Columns Name, which shows there are 2015 values in the broadband-now data 
 colnames(combined) 
+# Data types of the combined broadband datasets
+str(combined)
 
-#What is not combined?
-leftover <- anti_join(usage_combined, broadband, by = "Zip")
-write.csv(leftover,"D:/Documents/R/Digital Divide/Open_Data_Challenge/leftover.csv")
+# Convert COUNTY.ID to characters before joining with other files
+combined[3] <- as.character(combined$COUNTY.ID)
 
-# Part 2 Cenus data of households with children (under 18 years old) having computer/access to internet 
-## Census B28005 Table reformatted version with GEOid recode as COUNTY.ID
+# What is not combined between the two? 
+leftover <- anti_join(usage_combined, broadbandnow, by = "Zip")
+# The leftover dataframe shows 3250 rows of postal code that was not joined.
+write.csv(leftover,"D:/Documents/R/Open_data_challenge/unmatched-records-broadband.csv")
 
-b28005 <- read_excel('b28005-5yr estimates-geo.xlsx')
+#------------Census Tables--------------------------------------------------------------
+# Part 2 Cenus ACS data of households with children (under 18 years old) having computer/access to internet 
+# Census B28005 Table
+
+b28005 <- read_excel('./Datasets/b28005-5yr estimates-geo.xlsx')
+# There are 3220 county listed in the Census Bureau ACS table 
 head(b28005)
+str(b28005)
 
-#COUNTY.ID is stored as character in the Census original file 
-#Convert it to integer for now in order to map to the combined dataset 
-b28005$COUNTY.ID <- as.integer(b28005$COUNTY.ID)
-#Note that you lost the leading zero when convert county.id to integer
-
-#Append the Census Data to the combined dataset 
+# Append the Census Data to the combined dataset 
 combined_2 <- left_join(combined, b28005, by = "COUNTY.ID")
 
-rurality <- read_excel('County_Rural_Level_2010.xlsx')
-head(rurality)
-#County.ID lost the leading zero when load in rurality 
+# View datatypes after joining
+str(combined_2)
 
+#' There is an older dataset for rurality from Census 2010 
+rurality <- read_excel('./Datasets/County_Rural_Level_2010.xlsx')
+head(rurality)
+
+# County.ID lost the leading zero when load in rurality 
+rurality[1] <- as.character(rurality$COUNTY.ID)
+
+# The last column naming is problematic
+names(rurality)[5] <- "rurality"
+
+# There are 3142 county listed in the rurality dataset
+str(rurality)
+
+# Joint of broadband data, b28005 table, and rurality measure
 combined_3 <-left_join(combined_2, rurality, by = "COUNTY.ID")
 
-#-----------------------------------------------------------------------
+# There are 32735 rows with 48 variables
+str(combined_3)
 
-#Part 3 School Data
-#I found an issue with the ELIS data where schools are listed but is not on EDGE list. 
-#So I have to recheck the data in this step (March 9, 2021)
-#Append school location and school characteristics first before merging 
+# Cleaned up duplicated information in this dataframe to 20 variables 
+census_broadband <- select(combined_3, c("COUNTY.ID", "Zip", "BROADBAND.USAGE.x",
+                                      "BROADBAND.USAGE.y", "Population", "AverageMbps", "FastestAverageMbps",
+                                      "TestCount", "X.Access.to.Terrestrial.Broadband", "Total",
+                                      "Student", "Has-computer", "Has-computer-and-broadband",
+                                      "Has-computer-and-nointernet", "No-computer",
+                                      "Dial-up", "ST", "County", "State", "rurality"))
 
-#data <- read_excel(file.choose())  
+#---------------------NCES Public School Data-----------------------
 
-#schools <- read.csv("Public_School_Characteristics_2018-19.csv", header = T, 
-#                    sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
+# I found an issue with the ELIS data where schools are listed but is not on EDGE list. 
+# So I have to recheck the data in this step (March 9, 2021)
 
-#SY_STATUS_TEXT indicates if the school is currently operational 
-#schools <- subset(schools, SY_STATUS_TEXT == "Currently operational")
-
-#schools_loc2 <- left_join(schools, school_loc, by = "NCESSCH")
-#school_f <- schools_loc2[, c(4, 14:15, 40, 47, 48:51, 69:70, 90)]
-#write.csv(schools_loc2, "D:/Documents/R/Digital Divide/Open_Data_Challenge/error_file.csv" )
-
-#School location information
-#public school file exported from ELIS
-public_school <-read.csv('public_schoolsv2.csv', na = "na", header = T,
-                         strip.white = T, stringsAsFactors = TRUE, fileEncoding="UTF-8-BOM")
+public_school <-read_excel('./Datasets/public_schoolsv2.xlsx')
 
 #public school file exported from ELIS, when importing the excel file it was problematic with mixed data types.
 #Convert the excel file to csv for error free import (Note that csv version is 21 MB, instead of 11 MB in excel format)
@@ -100,39 +122,46 @@ str(public_school)
 
 get_dupes(public_school)
 
+public_school$Zip <- as.numeric(public_school$Zip)
+
 #Combine the school data with the broadband data 
-sch_broadband_combined <- left_join(public_school, combined_3, by= "Zip")
+sch_broadband <- left_join(public_school, census_broadband, by = "Zip")
 
-write.csv(sch_broadband_combined,"D:/Documents/R/Digital Divide/Open_Data_Challenge/Export/sch_broadband_combov2.csv")
-
-
-#Rename County ID column and Zip for merge later 
-#colnames(school_f)[3] <- "Zip"
-#colnames(school_f)[12] <- "COUNTY.ID"
-#colnames(school_f)
+#write.csv(sch_broadband, "./Datasets/sch_broadband_combov2.csv", row.names = F)
 
 #Load the title 1 status from the ELSI file 
-#title1 <- read.csv("ELSI_csv_export-m.csv", header = T, sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
+title1 <- read.csv("./Datasets/ELSI_csv_export-m.csv", header = T, 
+                   sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
 
-#Merging the title1 and school_f file 
-#sch_status <- left_join(school_f, title1, by = "NCESSCH")
+# data <- read_excel(file.choose())  
 
-#-------------------------------------------------------------
-#Part 4 SEDA data 
-#SEDA data of test scores and covarites by county level 
+all_schools <- read.csv("./Datasets/Public_School_Characteristics_2018-19.csv", header = T,
+                        sep = ",", strip.white = TRUE, fileEncoding="UTF-8-BOM")
 
-testscore <- read.csv("./SEDA/seda_county_long_cs_4.0.csv", header = T, sep = ",",
+# SY_STATUS_TEXT indicates if the school is currently operational 
+all_schools <- subset(all_schools, SY_STATUS_TEXT == "Currently operational")
+
+#-----------SEDA Data 4.0-----------------
+# SEDA data of test scores and covariates by county level 
+# The file size is a bit large which takes time to proces 124 MB and 520 MB
+
+testscore <- read.csv("./Datasets/SEDA/seda_county_long_cs_4.0.csv", header = T, sep = ",",
                       strip.white = TRUE)
 
-covariates <-read.csv("./SEDA/seda_cov_county_long_4.0.csv", header = T, sep = ",",
+covariates <-read.csv("./Datasets/SEDA/seda_cov_county_long_4.0.csv", header = T, sep = ",",
                      strip.white = TRUE)
 
-#First, have to filter out only the 2018 dataset
-score2018 <-testscore%>% filter(year == "2018")
+# First, have to filter out only the 2018 dataset
+score2018 <-testscore%>% filter(year == 2018)
 covariates2018 <- covariates%>% filter(year == 2018)
 
-#State info is missing from covariates file
-fips<- read.csv("fips_state.txt", sep="\t")
+# State info is missing from covariates file
+# FCC FIPS <https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt>
+
+fips <- read.table("fcc-state-fips.txt", 
+                   header = TRUE)
+
+
 
 score_m <-score2018[, c(1:6, 8:10)]
 covariates_m <-left_join(covariates2018, fips, by = "fips")
