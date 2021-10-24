@@ -52,8 +52,9 @@ The NCES Public Schools Characteristics Information was exported in March 2021. 
 The following dataset is for the 2018-2019 school years.
 
 ```{r}
-#Public school information exported from ELIS 2018-2018 school year used symbols "-" for missing values, † is for Not applicable, ‡ for data not met quality standard
-public_school <-read.csv('public_schoolv3.csv', na.strings = c("","-","‡"), 
+#Note: missing or suppressed values are represented by symbols, "-" for missing values, † is for Not applicable, ‡ for data not met quality standard
+
+public_school <-read.csv('./Datasets/public_schoolv3.csv', na.strings = c("","-","‡"), 
                          header = T, strip.white = T, sep = ",",
                          stringsAsFactors = TRUE, 
                          fileEncoding="UTF-8-BOM")
