@@ -141,47 +141,7 @@ all_schools <- read.csv("./Datasets/Public_School_Characteristics_2018-19.csv", 
 # SY_STATUS_TEXT indicates if the school is currently operational 
 all_schools <- subset(all_schools, SY_STATUS_TEXT == "Currently operational")
 
-#-----------SEDA Data 4.0-----------------
-# SEDA data of test scores and covariates by county level 
-# The file size is a bit large which takes time to proces 124 MB and 520 MB
-
-testscore <- read.csv("./Datasets/SEDA/seda_county_long_cs_4.0.csv", header = T, sep = ",",
-                      strip.white = TRUE)
-
-covariates <-read.csv("./Datasets/SEDA/seda_cov_county_long_4.0.csv", header = T, sep = ",",
-                     strip.white = TRUE)
-
-# First, have to filter out only the 2018 dataset
-score2018 <-testscore%>% filter(year == 2018)
-covariates2018 <- covariates%>% filter(year == 2018)
-
-# State info is missing from covariates file
-# FCC FIPS <https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt>
-
-fips <- read.table("fcc-state-fips.txt", 
-                   header = TRUE)
-
-
-
-score_m <-score2018[, c(1:6, 8:10)]
-covariates_m <-left_join(covariates2018, fips, by = "fips")
-
-# Rename sedacounty to COUNTY.ID
-colnames(covariates_m)[1] <- "COUNTY.ID"
-colnames(score_m)[3] <- "COUNTY.ID"
-
-
-# Export covariates_m, score_m, school_status, combined_3, broadband_seda
-write.csv(covariates_m,"D:/Documents/R/Digital Divide/Open_Data_Challenge/seda_covariates.csv")
-write.csv(score_m,"D:/Documents/R/Digital Divide/Open_Data_Challenge/seda_scores.csv")
-write.csv(combined_3,"D:/Documents/R/Digital Divide/Open_Data_Challenge/broadband_agg.csv")
-write.csv(broadband_seda,"D:/Documents/R/Digital Divide/Open_Data_Challenge/broadband_seda.csv")
-
-#Append the broadband data to the school data by zip code 
-#school_profile is the cleaned version
-#broadband_combined is the cleaned version
-sch <- read.csv("school_profile.csv")
-broad_cleaned <-read.csv("broadband_combined.csv")
-
-school_broadband_combo <-left_join(sch, broad_cleaned, by = "Zip")
-write.csv(school_broadband_combo, "D:/Documents/R/Digital Divide/Open_Data_Challenge/school_broadband_combined.csv" )
+#------------Factor score --------------------
+#Final dataset that generated factor scores in SPSS 
+factor_score <-read.csv("./Datasets/factor_score.csv", header = T, fileEncoding="UTF-8-BOM")
+str(factor_score)
