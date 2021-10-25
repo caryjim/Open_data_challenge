@@ -1,55 +1,79 @@
-#Part 4 SEDA data 
+library(tidyverse)
+
+#Part 4 SEDA data processing 
 #SEDA data of test scores and covarites by county level 
 
-testscore <- read.csv("./SEDA/seda_county_long_cs_4.0.csv", header = T, sep = ",",
-                      strip.white = TRUE)
+testscore <- read.csv("./Datasets/SEDA/seda_county_long_cs_4.0.csv", header = T, sep = ",",
+                      strip.white = TRUE) #338406 observations
 
-covariates <-read.csv("./SEDA/seda_cov_county_long_4.0.csv", header = T, sep = ",",
-                      strip.white = TRUE)
+covariates <-read.csv("./Datasets/SEDA/seda_cov_county_long_4.0.csv", header = T, sep = ",",
+                      strip.white = TRUE) #191197 observations
 
-#First, have to filter out only the 2018 dataset
-score2018 <-testscore%>% filter(year == "2018")
-covariates2018 <- covariates%>% filter(year == 2018)
+# Subset only the 2018 dataset from SEDA 4.0
+score2018 <-testscore%>% filter(year == 2018)
+covariates2018 <- covariates %>% filter(year == 2018)
+covariates2017 <- covariates %>% filter(year == 2017)
 
-#State info is missing from covariates file
-fips<- read.csv("fips_state.txt", sep="\t")
+# View dataframe and data types of test scores 
+head(score2018) # 33027 observations 
+colnames(score2018) # We only need the first 10 columns, no need for score by race
 
-score_m <-score2018[, c(1:6, 8:10)]
-covariates_m <-left_join(covariates2018, fips, by = "fips")
+score2018 <- select(score2018, c(1:10))
+
+str(score2018)  
+# Rename the sedacounty column to COUNTY.ID
+colnames(score2018)[3] <- "COUNTY.ID"
+
+# Convert COUNTY.ID to character 
+score2018[3] <- as.character(score2018$COUNTY.ID)
+
+# Count unique county in score2018 
+score2018 %>% group_by(COUNTY.ID) %>% summarise(count = n_distinct(COUNTY.ID))
+# There are 3055 COUNTY.ID distinct count 
+
+#write.csv(score2018, "./Datasets/SEDA/score2018.csv", row.names = F)
+
+#--- SEDA covariates----------------------------------------------
+
+head(covariates2018) #19014 observations
+colnames(covariates2018)
+
+# Subset the needed columns 
+cov_2018 <- select(covariates2018, c(1:18, 27:28))
+str(cov_2018) 
 
 # Rename sedacounty to COUNTY.ID
-colnames(covariates_m)[1] <- "COUNTY.ID"
-colnames(score_m)[3] <- "COUNTY.ID"
+colnames(cov_2018)[1] <- "COUNTY.ID"
+cov_2018[1] <- as.character(cov_2018$COUNTY.ID)
 
+#write.csv(cov_2018, "./Datasets/SEDA/covariates-2018.csv", row.names = F)
 
-# Export covariates_m, score_m, school_status, combined_3, broadband_seda
-write.csv(covariates_m,"D:/Documents/R/Digital Divide/Open_Data_Challenge/seda_covariates.csv")
-write.csv(score_m,"D:/Documents/R/Digital Divide/Open_Data_Challenge/seda_scores.csv")
-write.csv(combined_3,"D:/Documents/R/Digital Divide/Open_Data_Challenge/broadband_agg.csv")
-write.csv(broadband_seda,"D:/Documents/R/Digital Divide/Open_Data_Challenge/broadband_seda.csv")
-
-# Import a difference covariate file 
-covariates_2 <-read.csv("./SEDA/seda_cov_county_poolyr_4.0.csv", header = T, sep = ",",
-                      strip.white = TRUE)
-library(tidyverse)
-covariates2017 <-covariates_2%>% filter(year == 2017)
-covariates2018 <- covariates_2%>% filter(year == 2018)
-colnames(covariates2018)[1] <- "COUNTY.ID"
-colnames(covariates2018)
-colnames(covariates2017)[1] <- "COUNTY.ID"
+head(covariates2017) #19250 observations
 colnames(covariates2017)
-seda_covariate <-covariates2018[,c(1,2, 9:16, 27)]
-write.csv(seda_covariate,"D:/Documents/R/Digital Divide/Open_Data_Challenge/Analysis/seda_covariates.csv", row.names = F)
-#to extract values needs for the missing one in 2018. 
-seda_covariate17 <-covariates2017[,c(1,2, 9:16, 27)]
 
-#Re-load files into this space
-seda_cov <- read.csv("seda_covariates.csv", header = T)
+# Subset the needed columns 
+cov_2017 <- select(covariates2017, c(1:18, 27:28))
+str(cov_2017) 
 
-factor_score <-read.csv("./SPSS/factor_score.csv", header = T, fileEncoding="UTF-8-BOM")
-library(tidyverse)
-library(dplyr)
-#unmatched <- anti_join(factor_score, seda_cov, by = "COUNTY.ID")
+# Rename sedacounty to COUNTY.ID
+colnames(cov_2017)[1] <- "COUNTY.ID"
+cov_2017[1] <- as.character(cov_2017$COUNTY.ID)
 
-unmatched <-anti_join(covariates2017, covariates2018, by = "COUNTY.ID")
-write.csv(unmatched,"D:/Documents/R/Digital Divide/Open_Data_Challenge/Analysis/unmatched.csv", row.names = F)
+#write.csv(cov_2017, "./Datasets/SEDA/covariates-2017.csv", row.names = F)
+
+# Note. The 2018 dataset is missing information for several counties. 
+# Therefore, I had to use the 2017 school year from the covariate dataset for
+# SES values for several regions. 
+
+unjoined_cov <- anti_join(cov_2017, cov_2018, by = c("COUNTY.ID", "grade")) # Check what is not joined.
+
+str(unjoined_cov)
+
+# There are 236 unjoined rows which included 6 level of grades, which is 38 counties
+
+cov_combined <- left_join(cov_2017, cov_2018, by = c("COUNTY.ID", "grade"))
+# There are 19250 observation returned
+
+head(cov_combined)
+
+#write.csv(cov_combined, "./Datasets/SEDA/COV-combined-2017to2018.csv", row.names = F)
