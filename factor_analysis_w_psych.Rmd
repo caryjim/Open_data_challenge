@@ -1,0 +1,124 @@
+---
+title: "Factor analysis with PSYCH package"
+output: html_notebook
+---
+
+Load dataset and libraries 
+
+```{r}
+library(psych)
+library(GPArotation)
+```
+
+
+```{r}
+sdo <- read.csv("./Datasets/factor_score.csv", header = T, fileEncoding="UTF-8-BOM")
+
+colnames(sdo)
+head(sdo)
+```
+# Factor Analysis using PSYCH package
+
+```{r}
+# Composite 1 
+composite_1 <- sdo[,c(19:22, 24:26,32:33)]
+```
+
+
+```{r}
+head(composite_1)
+```
+```{r}
+str(composite_1)
+```
+
+```{r}
+model_1 <- fa(composite_1, nfactors = 3, residuals=TRUE)
+model_1
+```
+```{r}
+summary(model_1$residual)
+```
+Standardized Scores
+```{r}
+head(model_1$scores)
+```
+Model 2
+```{r}
+# Model_2 with 2 factors with ML estimation  
+model_2 <-fa(composite_1, nfactors = 2, residuals = TRUE, fm="ml")
+model_2
+```
+Model 3 with Anderson score
+```{r}
+model_3 <- fa(composite_1, nfactors = 2, scores='Anderson', residuals=TRUE)
+model_3
+```
+```{r}
+summary(model_3$scores)
+```
+
+# Aspect Method 
+
+```{r}
+library(aspect)
+```
+Correlation Mat (takes a long time to run)
+```{r}
+cor.mat<-corAspect(composite_1,  aspect = "aspectSum", pow = 2)
+```
+
+```{r}
+plot(cor.mat, plot.type ="transplot")
+```
+
+```{r}
+names(cor.mat)
+```
+
+```{r}
+scores.cor.mat <- cor.mat$scoremat
+head(scores.cor.mat)
+```
+
+```{r}
+pairs(scores.cor.mat)
+```
+# Method with correlation and scores 
+
+```{r eval=FALSE, include=FALSE}
+comp.fit1 <-fa(scores.cor.mat, rotation="varimax", scores="Anderson", 
+             nfactors=2, residuals=TRUE, fm="ml")
+```
+
+# Omega method 
+
+```{r}
+comp.fit2 <- omega(scores.cor.mat, rotation="oblimin", 
+                scores="regression", nfactors=2, residuals=TRUE, fm="ml")
+```
+
+```{r}
+comp.fit2
+```
+View score
+```{r}
+cor(comp.fit2$scores)
+```
+
+```{r}
+names(comp.fit2)
+```
+
+```{r}
+summary(comp.fit2$residual)
+```
+
+```{r}
+pairs(comp.fit2$scores)
+```
+
+```{r}
+pairs(cbind(scores.cor.mat, comp.fit2$scores))
+```
+
