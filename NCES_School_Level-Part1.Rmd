@@ -24,10 +24,6 @@ library(psychTools)
 ```
 
 ```{r}
-options("rsconnect.http" = 'curl')
-```
-
-```{r}
 getOption("digits")
 ```
 
@@ -51,6 +47,11 @@ inline_hook <- function (x) {
 
 knit_hooks$set(inline = inline_hook)
 ```
+
+```{r}
+
+```
+
 
 Data Source: U.S. Department of Education, National Center for Education Statistics, Common Core of Data (CCD), "Public Elementary/Secondary School Universe Survey", 2018-19; "Public Elementary/Secondary School Universe Survey Geographic Data (EDGE)", 2018-2019.
 
