@@ -1,0 +1,115 @@
+---
+title: "NCES-School-Status"
+author: "Cary K. Jim"
+date: "10/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Library/Packages
+```{r Load packages}
+library(tidyverse)
+library(janitor)
+```
+Data Source: U.S. Department of Education, National Center for Education Statistics, Common Core of Data (CCD), "Public Elementary/Secondary School Universe Survey", 2018-19; "Public Elementary/Secondary School Universe Survey Geographic Data (EDGE)", 2018-2019.
+
+† indicates that the data are not applicable. -- indicates that the data are missing. ‡ indicates that the data do not meet NCES data quality standards.
+
+```{r}
+#Public school information exported from ELIS 2018-2019 school year used symbols "-" for missing values, † is for Not applicable, ‡ for data not met quality standard
+public_school <-read.csv('./Datasets/public_schoolv3.csv', na.strings = c("","-","‡"), 
+                         header = T, strip.white = T, sep = ",",
+                         fileEncoding="UTF-8-BOM")
+
+#public school file exported from ELIS, when importing the excel file it was problematic with mixed data types.
+#Note that csv version is 26 MB, instead of 15 MB in excel format
+```
+# Public School Data 2018-2019 School Year
+```{r Column Names}
+colnames(public_school)
+```
+
+```{r}
+head(public_school)
+```
+
+```{r Data Types}
+str(public_school) #99348 rows
+```
+
+Note that some data types aren't read in correctly. For this exploration there is no modification. 
+
+```{r check for duplicates}
+get_dupes(public_school)
+```
+
+# Part 1. Data Exploration
+
+```{r Incomplete cases}
+public_school[!complete.cases(public_school),]
+# There are 5049 incomplete cases in the public school data
+```
+
+The missing values come from Title I School Status, FTE Equivalent, Pupil.Teacher.Ratio
+
+```{r School types }
+table(public_school$School.Type)
+```
+
+```{r}
+#What falls in the alternative/other school category in School.Type?
+public_school %>% filter(School.Type == "4-Alternative/other school")
+```
+
+Some Regional Service Agency (RESA), or a Regular local school district that is NOT a component of a supervisory union, or State agency providing elem and/or secondary level instruction are considered a 4-Alternative type
+
+```{r School open status}
+#Table of school status and counts
+table((public_school$Updated.Status))
+```
+
+```{r School with future or added status}
+#Do we have any information for school that is "Added" or "Future" status? 
+public_school %>% filter(Updated.Status == "7-Future" | Updated.Status == "4-Added")
+```
+
+There are 396 schools with future or added status. Any schools under the "7-Future" status do not have enrollment information. Some "Added schools" have information on enrollment and some schools do not.
+
+```{r School changed boundaries}
+public_school %>% filter(Updated.Status == "5-Changed Boundary/Agency")
+```
+
+We do have enrollment information for these schools that changed boundaries
+
+```{r Reopended School}
+public_school %>% filter(Updated.Status == "8-Reopened")
+```
+
+Some values are missing in the reopened schools.
+
+```{r New School}
+#Do we have any information for school that is "New" 
+public_school %>% filter(Updated.Status == "3-New")
+```
+
+```{r Agency types}
+table(public_school$Agency.Type)
+```
+
+```{r RESA school agency type}
+public_school %>% filter(Agency.Type == "4-Regional Education Service Agency (RESA)")
+```
+
+Schools operates under the RESA district type seems to have missing enrollment information.
+
+------------------------------------------------------------------------
+
+**Part 1. Data Exploration Summary** Reviewing the data, it reveals some useful information. 
+
+1.  For example, we are not including any public schools listing that provides adult education. However, the School name revealed that a portion of these incomplete cases are "ADULT ED" or "Adult education".
+
+2.  The Updated.Status variables provides information on the operational status of the school. We cannot simply remove school by these categories because enrollment information are included in some categories. Only the "Future" status have no enrollment information.
+
+3.  District Types which is named as Agency type provides information on who operates these schools. Generally, RESA are entities that support local school district and therefore may be serving students that is already counted in a regular school.
