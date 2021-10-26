@@ -1,0 +1,157 @@
+---
+title: "BroadbandNow Data Processing"
+author: "Cary"
+date: "2/6/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import R packages/libraries
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(stringr)
+library(janitor)
+```
+
+# Load dataset with 2019 and 2015 provider information
+
+```{r}
+#Retrieve broadband data from previous extraction
+broadbandnow <-read.csv("./Datasets/broadbandnow-export.csv", header = T, sep = ",", strip.white = TRUE)
+```
+View dataframe
+```{r}
+head(broadbandnow)
+```
+Column Names
+```{r}
+colnames(broadbandnow)
+```
+View data type of each column
+```{r}
+str(broadbandnow)
+```
+Even though the column names [5:11] indicated 2020, the actual data is from June 2019 FCC Form 477 reports. The zip-code, county, state information are kept in both files for reference. 
+```{r eval=FALSE, include=FALSE}
+get_dupes(broadbandnow) # No duplicates, check with janitor package
+```
+## Rename column names and convert data type 
+
+```{r}
+colnames(broadbandnow)[16] <- 'Month_price' #Rename the lowest monthly price for internet only service in wired and fixed wireless
+
+numeric(length = 2) #Set the option to avoid coercing values into integer
+
+broadbandnow$Month_price <- as.numeric(broadbandnow$Month_price) #Convert values to float
+
+colnames(broadbandnow)[15] <- 'Percent_access' #Rename the percentage of access to fixed and fixed wireless broadband 
+
+#Parse all the "%" character from the Percent-access column
+broadbandnow$Percent_access <- str_replace(broadbandnow$Percent_access, "\\%", "")
+
+broadbandnow$Percent_access <- as.numeric(broadbandnow$Percent_access) #Convert values to numeric
+```
+View data type again
+```{r}
+str(broadbandnow)
+```
+
+
+```{r}
+broadbandnow$Population <- as.numeric(broadbandnow$Population) # Convert Population to numeric
+
+broadbandnow$Zip <- as.character(broadbandnow$Zip) #Convert Zipcode to character 
+
+#The All100_3 columns are missing the proper year 
+colnames(broadbandnow)[11] <- 'All100_3_2020' #Rename the 11th column to add 2020
+colnames(broadbandnow)[23] <- 'All100_3_2015' #Rename the last column to add 2015
+```
+View data type again 
+```{r}
+str(broadbandnow)
+```
+Note. %Access to Terrestrial Broadband (renamed to Percent_access): Percent of the Zip's Population that has Access to Terrestrial (Wired + Fixed Wireless) Broadband (25 Mbps Download / 3 Mbps Upload)
+
+## Descriptive and Missing Values 
+There are 2881 zip-code without any population information 
+There are 2923 zip-code without Percent access information
+```{r}
+summary(broadbandnow)
+```
+Determine which zip-code have missing data 
+```{r}
+# There are 32608 rows of zip-code loaded in the dataframe 
+# The number of incomplete cases are 8389 (32608-24219) 
+sum(complete.cases(broadbandnow))
+```
+# Split the two years 
+The missing values could be because of the two years in the original dataframe 
+
+```{r}
+# Both subset will contain zip-code, county information, and population 
+broadbandnow_2019 <- broadbandnow[, c(1:16)]
+broadbandnow_2015 <- broadbandnow[, c(1:4, 17:23)]
+```
+Note. Population: Total Population of Zip Code (2010) in Broadband-Now 
+## 2015
+```{r}
+sum(complete.cases(broadbandnow_2015))
+```
+There are 29724 complete cases in 2015.
+
+The 2015 data only has information about the providers. There is no percent access, or speed
+information with it. 
+## 2019
+```{r}
+sum(complete.cases(broadbandnow_2019))
+```
+There are 24219 complete cases in 2019, which is 5505 difference to 2015
+### Zip-code with missing information 
+Determine which zip-code have missing values, by producing a dataframe 
+```{r}
+broadbandnow_2019[!complete.cases(broadbandnow_2019),] # 8389 rows
+```
+
+
+```{r}
+popu_2019 <- read.csv("./Datasets/ACS_5Y2019.B01003_popu.csv", header = T)
+str(popu_2019)
+```
+Split the Geographic.Area.Name into two columns first because there are two codes in it 
+```{r}
+popu_2019 <- separate(popu_2019, col = Geographic.Area.Name, into = c("ZCTAs", "Zip"), sep = " ")
+```
+
+Join the population data to the Broadband-now dataframe 
+```{r}
+data <- broadbandnow_2019 %>% left_join(popu_2019, by = "Zip")
+```
+The output has 32608 rows and the added Census information can verify if the zipcode
+has any people living there, or simply a postal code. 
+
+```{r}
+data <- data %>% drop_na(c("Population", "Estimated_total"))
+```
+There are 27366 rows of zip-code left 
+
+```{r}
+sum(complete.cases(data))
+```
+
+```{r eval=FALSE, include=FALSE}
+# Export this level of data 
+write.csv(data, "./Datasets/broadbandnow-2019.csv", row.names = F)
+```
+
+
+
+
