@@ -1,5 +1,5 @@
 ---
-title: "School Data Analysis"
+title: "Aggregate Locale and Title I Status by State"
 author: Cary K. Jim
 output: html_notebook
 ---
@@ -149,67 +149,60 @@ Note. The percentage of each locale by school types can also be used as a compar
 ```{r Create a dataframe for Title I status levels}
 t2 <- public_school %>% 
   group_by(ST, Title.I.School.Status) %>%
-  summarise(each_count = n())
+  summarise(count = n())
 ```
 
 ```{r}
-t2 %>% group_by(ST) %>%
-  summarise(Title.I.Status = n_distinct(Title.I.School.Status))
+head(t2)
 ```
 
+
 ```{r}
-levels(t2)
+levels(t2$Title.I.School.Status)
 ```
 
 
 ```{r rename factors level}
-library(forcats)
-
-fct_recode(t2, S = "small", M = "medium", L = "large")
-
+levels(t2$Title.I.School.Status) <- c("TAE_No", "TAE", "SW_TAE", "SW_No", "SW", "NOT_TitleI", "Unknown")
 ```
 
-
-```{r eval=FALSE, include=FALSE}
-# A different method with the same result as t2
-#public_school %>% count(ST, Title.I.School.Status)
+```{r}
+head(t2)
 ```
 
-```{r Spread the columns}
-t2 <- spread(t2, Title.I.School.Status, each_count)
+```{r}
+t2 <- spread(t2, Title.I.School.Status, count)
 t2
 ```
-
-Since we have to perform calculation, we will impute all NA as zero
-
+Since we have to perform calculation, we will impute all NA as zero 
 ```{r Fill-in missing counts as 0}
 t2[is.na(t2)] = 0
 ```
 
-```{r Total across the levels}
-#Create a total column
-t2$total <- rowSums(t2[,2:7])
+```{r Create total column}
+t2$total <- rowSums(t2[,2:8])
 t2
 ```
 
+
+```{r Calculate percentage of each levels by total}
+t2$Unknown <- t2$Unknown/t2$total
+t2$TAE_No <- t2$TAE_No/t2$total
+t2$TAE <- t2$TAE/t2$total
+t2$SW_TAE <- t2$SW_TAE/t2$total
+t2$SW_No <-t2$SW_No/t2$total
+t2$SW <- t2$SW/t2$total
+t2$NOT_TitleI <- t2$NOT_TitleI/t2$total
+```
+
+Verify the calculation
+
 ```{r Verify the calculation}
 #Confirming the percentages are calculated correctly
-t2 <- public_school %>% 
+public_school %>% 
   group_by(ST, Title.I.School.Status) %>%
   summarise(each_count = n()) %>%
   mutate(Title1_percent = each_count/sum(each_count))
-
-head(t2)
-```
-```{r Drop a Column, Spread the dataframe}
-t2 <- t2[ ,c(1:2,4)]
-```
-
-```{r}
-#Spread
-t2 %>% spread(Title.I.School.Status, Title1_percent)
-
-head(t2)
 ```
 
 ## Task 3. Combine dataframes 
