@@ -1,0 +1,226 @@
+---
+title: "NCES Public School 2018-2019 Data Processing"
+author: Cary K. Jim
+output: html_notebook; github_document
+---
+
+Library/Package
+
+```{r Load packages}
+library(tidyverse)
+library(janitor)
+```
+
+Data Source: U.S. Department of Education, National Center for Education Statistics, Common Core of Data (CCD), "Public Elementary/Secondary School Universe Survey", 2018-19; "Public Elementary/Secondary School Universe Survey Geographic Data (EDGE)", 2018-2019.
+
+† indicates that the data are not applicable. -- indicates that the data are missing. ‡ indicates that the data do not meet NCES data quality standards.
+
+```{r Load data}
+public_school <-read.csv('./Datasets/public_schoolv3.csv', na.strings = c("","-","‡"), 
+                         header = T, strip.white = T, sep = ",",
+                         fileEncoding="UTF-8-BOM")
+```
+
+Part 1 of exploring data can be found in RPubs page <https://rpubs.com/caryjim/nces-ps-status>
+
+# Part 2. Data Cleaning and Processing
+
+## Task 2.1 Remove schools that is not in operation or with no enrollment
+
+```{r Remove by no enrollment}
+# Remove schools that have no enrollment information, the subset function will also drop rows with no values
+public_school <- subset(public_school, !(Members == "0"))  #97225 rows
+```
+
+```{r Remove by n/a enrollment}
+#Remove schools that have no enrollment information, n/a is not applicable 
+public_school <- subset(public_school, !(Members == "n/a")) #95267 rows
+```
+
+```{r Table of school status count}
+#Check how the school status looks like after removing schools with no enrollment information
+#Do we have any information for school that is "Added" or "Future" status? 
+table(public_school$Updated.Status)
+```
+
+## Task 2.2 Remove schools based on Agency Type
+
+```{r Remove by RESA agency}
+# We will exclude Regional Education Service Agency (RESA)
+public_school <- subset(public_school, !(Agency.Type == "4-Regional Education Service Agency (RESA)")) #94619 rows
+```
+
+```{r Review Agency.Type categories}
+table(public_school$Agency.Type)
+```
+
+We don't want to simply drop a school if it is not a regular school. Therefore, it is best to include specialized schools that are serving students who may not be enrolled in a general education classroom.
+
+\#\#\#Task 2.3 Review the incomplete cases at this point
+
+```{r incomplete data }
+incomplete_sch <- public_school[!complete.cases(public_school),] #3523 rows
+#It looks like FTE is the column that is causing the incomplete cases at this time.
+head(incomplete_sch)
+```
+
+There are still a subset of schools that contain missing values, such as "Title.I. School.Status", "FTE.Equivalent", and "Pupil.Teacher.Ratio". It won't be significantly affect the following steps. So we will leave these missing values in the data for now.
+
+## Task 3. Convert Data Types
+
+```{r}
+str(public_school)
+```
+
+## Task 3.1 Enrollment Information
+
+Note: We have to pass the value as characters first, otherwise R will assign a level value
+
+```{r Convert Memebers to numeric}
+#Members, Male, Female, FTE and Pupil.Teacher Ratio are as a factor level due to the symbol used in the original data 
+public_school$Members <- as.integer(as.character(public_school[,15]))
+```
+
+```{r Review dataframe after conversion}
+head(public_school)
+```
+
+```{r Convert Male and Female counts to numeric}
+public_school$Male <- as.integer(as.character(public_school[,16]))
+public_school$Female <- as.integer(as.character(public_school[,17]))
+```
+
+```{r Review dataframe }
+head(public_school)
+```
+
+\#\#Task 3.2 FTE and Pupil Teacher Ratio
+
+### Convert FTE and Pupil Teacher Ratio to numeric
+
+```{r Convert FTE to numeric}
+public_school$FTE.Equivalent <- as.numeric(as.character(public_school[,18]))
+```
+
+```{r Convert Pupil to Teacher Ratio}
+public_school$Pupil.Teacher.Ratio <- as.numeric(as.character(public_school[,19]))
+```
+
+Note that original n/a - not applicable values are now replaces with NAs, which is not a problem since we don't have information on that either.
+
+```{r}
+head(public_school)
+```
+
+#### Task 3.3 Review incomplete cases at this point
+
+```{r}
+incomplete_sch <- public_school[!complete.cases(public_school),]
+# There are about 3989 schools that didn't have the FTE information or Pupil to Teacher Ratio. However those are not necessary needed in the next step. We can move forward this this dataframe.
+head(incomplete_sch)
+```
+
+## Task 4. Rename factor levels and re-order levels
+
+```{r Counts of each Title 1 categories}
+table(public_school$Title.I.School.Status)
+```
+
+### Task 4.1 Re-organize Title I levels
+
+Convert characters to level first
+
+```{r convert to factor level}
+public_school$Title.I.School.Status <- as.factor(public_school$Title.I.School.Status)
+```
+
+View levels
+
+```{r View levels}
+levels(public_school$Title.I.School.Status)
+```
+
+View dataframe
+
+```{r}
+head(public_school)
+```
+
+```{r View counts in each levels within Title 1}
+table(public_school$Title.I.School.Status) 
+#Total count is 93810, which means there are missing values in the dataset 
+```
+
+```{r Check for missing values in Title 1 status}
+#Where are the missing values in Title 1 Status?
+table(is.na(public_school$Title.I.School.Status)) #There are 809 missing value in Title 1 
+```
+
+```{r Create an unknown level }
+#Create a level first in order to handle missing values, otherwise it gives an error
+a <- levels(public_school$Title.I.School.Status)
+a[length(a) + 1] <- "Unknown"
+```
+
+```{r Assign the unknown level }
+#Add the level to the variables
+public_school$Title.I.School.Status <- factor(public_school$Title.I.School.Status, levels = a)
+#Add the level to the missing values 
+public_school$Title.I.School.Status[is.na(public_school$Title.I.School.Status)] <- "Unknown" 
+```
+
+```{r View levels again after change}
+levels(public_school$Title.I.School.Status)
+```
+
+```{r Review levels and counts in each}
+#Check to make sure the count for each level is still correct 
+table(public_school$Title.I.School.Status)
+```
+
+## Task 5 Aggregrate Urbanicity/Rurality information 
+
+```{r}
+#View Counts in each level 
+table((public_school$Urban.centric.Locale))
+```
+
+
+```{r Convert Locale to factors}
+public_school$Urban.centric.Locale <- as.factor(public_school$Urban.centric.Locale)
+#View levels after conversion
+levels(public_school$Urban.centric.Locale)
+```
+
+```{r Aggregate City level}
+#For this analysis, we will only be concern with the 4 major levels of locale 
+levels(public_school$Urban.centric.Locale)[1:3] <- "City"
+levels(public_school$Urban.centric.Locale)
+```
+
+```{r Aggregate Suburban level }
+#I discovered that the levels changed after converting city.So I need to adjust the index
+levels(public_school$Urban.centric.Locale)[2:4] <- "Suburb"
+levels(public_school$Urban.centric.Locale)
+```
+
+
+```{r Aggregate Town level }
+levels(public_school$Urban.centric.Locale)[3:5] <- "Town"
+levels(public_school$Urban.centric.Locale)
+```
+
+```{r Aggregate Rural level}
+levels(public_school$Urban.centric.Locale)[4:6] <- "Rural"
+levels(public_school$Urban.centric.Locale)
+```
+
+```{r Check to ensure levels have the correct counts}
+table(public_school$Urban.centric.Locale)
+```
+Urbanicity/Rurality is converted to 4 levels now 
+
+```{r eval=FALSE, include=FALSE}
+#Export the cleaned data 
+write.csv(public_school,"./Datasets/public_school_processed.csv", row.names = F)
+```
