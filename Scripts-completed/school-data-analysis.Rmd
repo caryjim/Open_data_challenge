@@ -3,6 +3,10 @@ title: "Aggregate Locale and Title I Status by State"
 author: Cary K. Jim
 output: html_notebook
 ---
+```{r eval=FALSE, include=FALSE}
+# This has been published to the RPubs as NCES Public School 2018-2019 Locale and Title I status file on Oct 26,2021
+```
+
 
 Import Library/Packages
 
