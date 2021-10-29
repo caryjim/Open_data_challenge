@@ -1,0 +1,213 @@
+---
+title: "BroadbandNow Open Data Exploration"
+author: "Cary"
+date: "2/6/2021"
+output:
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Import R packages/libraries
+
+```{r import libraries}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(readxl)
+library(stringr)
+library(janitor)
+```
+
+## Load and seperate the dataset into 2019 and 2015 providers
+
+```{r}
+#Retrieve broadband data from Github
+broadbandurl <- 'https://raw.githubusercontent.com/BroadbandNow/Open-Data/master/broadband_data_opendatachallenge.csv'
+broadband <-read.csv(url(broadbandurl), header = T, sep = ",", strip.white = TRUE)
+# The raw data have numerical values in population, percent of access and lowest price.
+# However, they were loaded as character and needs to be converted to numeric 
+```
+
+Even though the column names indicated 2020, the actual data is from June 2019 FCC 477 reports. The zipcode, county, state information are kept in both files for reference. 
+```{r}
+head(broadband) #Load dataframe
+
+colnames(broadband) #Check column names and index
+get_dupes(broadband) #Check for duplicates with janitor package
+```
+## Rename selected column and convert data type 
+
+```{r}
+colnames(broadband)[16] <- 'Month_price' #Rename the lowest monthly price for internet only service in wired and fixed wireless
+numeric(length = 2) #Set the option to avoid coercing values into integer
+broadband$Month_price <- as.numeric(broadband$Month_price) #Convert values to float
+
+colnames(broadband)[15]<- 'Percent_access' #Rename the percentage of access to fixed and fixed wireless broadband
+#Parse all the "%" character from the Percent-access column
+broadband$Percent_access <- str_replace(broadband$Percent_access, "\\%", "")
+
+broadband$Percent_access <- as.numeric(broadband$Percent_access) #Convert values to numeric
+```
+
+```{r}
+broadband$Population <- as.numeric(broadband$Population) # Convert Population to numeric
+
+broadband$Zip <- as.character(broadband$Zip) #Convert Zipcode to character 
+
+#The All100_3 columns are missing the proper year 
+colnames(broadband)[11] <- 'All100_3_2020' #Rename the 11th column to add 2020
+colnames(broadband)[23] <- 'All100_3_2015' #Rename the last column to add 2015
+```
+
+
+## Descriptive and Missing Values 
+
+```{r}
+summary(broadband)
+```
+
+## Using Dallas County as an example, I'm assessing how does the does the data looks like for a metropolitan area 
+```{r}
+dallas <- broadband %>% filter(County == 'Dallas')
+# this return all rows with Dallas county regardless of which state
+dallas
+```
+```{r}
+dallas <-broadband %>% filter(State == 'Texas') %>% filter (County == 'Dallas')
+#This filter by state and then by county to get only Dallas County data within Texas
+
+dallas
+```
+```{r}
+# As you noticed, there are quiet a few of missing information per zip code within Dallas County in Texas
+summary(dallas)
+
+```
+38 rows missing within 122 rows is about 31%
+
+After checking the postal codes in [City-Data.com](https://www.city-data.com/zipDir.html), for example 75391-75399, this set of zip code doesn't have any population information associated with it. 
+
+## Using a rural area to check the dataset. The census data has a [Rural America](https://mtgis-portal.geo.census.gov/arcgis/apps/MapSeries/index.html?appid=49cd4bc9c8eb444ab51218c1d5001ef6#:~:text=The%20Census%20Bureau%20defines%20rural,tied%20to%20the%20urban%20definition) page for county rurality. 
+
+```{r}
+# Crockett County, Texas with a 22.7 Percent Rural 
+crockett <- broadband %>% filter(County == 'Crockett')
+crockett
+#There are five rows filter and with only one row for Texas 
+```
+
+```{r}
+# Schleicher County, Texas with a 100 Percent Rural 
+schleicher <- broadband %>% filter(County == 'Schleicher')
+schleicher
+#There is only one result for this Schleicher in the dataset 
+```
+
+## Slice the data by the years 2015 and 2019
+
+```{r}
+#Extract the 2019 broadband information from the pricing and speed information 
+data2019 <- broadband[, c(1:16)]
+data2015 <- broadband[, c(1:4, 17:23)]
+
+```
+
+## We would like to add a new column to the 2019 dataset considering the true price that a user will pay for internet services including taxes and fees. Currently we estimated a 25% on top of the internet charge as taxes and fees
+
+```{r}
+# Append a column to the dataset with consideration of fees and tax on final price 
+data2019$est_final_price <- broadband$Month_price * 0.25
+```
+
+## Reivew information in the extracted 2019 dataset 
+
+```{r}
+colnames(data2019)
+```
+```{r}
+summary(data2019)
+```
+
+
+# Census B28005 Table reformmated version import and conduct futher cleaning 
+
+```{r}
+b28005 <- readxl::read_excel('./Datasets/b28005-5yr estimates-geo.xlsx')
+
+head(b28005)
+```
+
+
+```{r}
+#Check for missing values - incomplete cases 
+b28005[!complete.cases(b28005),]
+```
+
+```{r}
+#remove those incomplete cases, from 829 row to 826 
+b28005 <- na.omit(b28005)
+```
+
+
+```{r}
+#Convert County and State as Factors first 
+b28005$State <- as.factor(b28005$State)
+names(b28005)[1] <- "County" #rename the column to remove random characters
+b28005$County <- as.factor(b28005$County)
+#Checking the levels in the State variable 
+levels(b28005$State)
+```
+
+
+```{r}
+#Review data description 
+summary(b28005)
+```
+
+
+
+```{r}
+# Need to convert some of the values into numeric form for further calculation
+b28005$Under.18.years <- as.integer(b28005$Under.18.years)
+
+headers <- c("Total", "Under.18.years", "Has.a.computer", "With.dial.up.alone", "With.a.broadband","Without.any.internet","No.computer")
+b28005[,headers] <- lapply(b28005[,headers], as.numeric, na.rm = F)
+```
+
+
+## Add columns of percentage calculation for under 18 that owns a computer , had broadband
+
+```{r}
+b28005$k12pop <- b28005$Under.18.years/b28005$Total
+b28005$own_comp_percent <- b28005$Has.a.computer/b28005$Under.18.years
+b28005$has_broadband_percent <- b28005$With.a.broadband/b28005$Under.18.years
+```
+
+```{r}
+b28005
+```
+## Groupby states for a state dataframe 
+
+```{r}
+#using groupby statement, I can go ahead and aggregate the columns that I wanted. 
+state_b28005 <- b28005 %>% 
+  group_by(State) %>% 
+  summarize(state_total = sum(Total), state_k12 = sum(Under.18.years), broadband = sum(With.a.broadband), computer = sum(Has.a.computer))
+
+state_b28005
+```
+
+```{r}
+state_b28005$k12_percent <- state_b28005$state_k12/state_b28005$state_total
+state_b28005$computer_percent <- state_b28005$computer/state_b28005$state_k12
+state_b28005$broadband_percent <- state_b28005$broadband/state_b28005$state_k12
+```
+
+```{r}
+state_b28005
+```
+
