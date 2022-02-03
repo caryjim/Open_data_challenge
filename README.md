@@ -13,4 +13,4 @@ was used for a quick viz, as well as mapping Nex Mexico data for regions that is
 References: 
 - tidycensus <https://walker-data.com/tidycensus/articles/basic-usage.html> 
 - B01003 Census Table - Total Population by Zip (33120 rows of zip)
-- Product of our work in Tableau Public: [Students Digital Opportunity Map](https://public.tableau.com/views/EducationOpenDataChallenge-D2IETeam/Broadband?:language=en-US&:display_count=n&:origin=viz_share_link)
+- Product of our work in Tableau Public: [Students Digital Opportunity Map](https://public.tableau.com/views/EducationOpenDataChallenge-D2IETeam/SDO?:language=en-US&:display_count=n&:origin=viz_share_link)
